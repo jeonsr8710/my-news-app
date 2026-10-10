@@ -5,21 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>실시간 주요 뉴스 Top 5</title>
   
-  <!-- PWA 매니페스트 및 브라우저 테마 설정 -->
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#0d6efd">
-  
-  <!-- iOS Safari 모바일 최적화 -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="주요뉴스">
 
   <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans KR", sans-serif;
       background-color: #f8f9fa;
@@ -35,10 +28,7 @@
       padding-bottom: 12px;
       border-bottom: 1px solid #e9ecef;
     }
-    h1 {
-      font-size: 1.25rem;
-      font-weight: 700;
-    }
+    h1 { font-size: 1.25rem; font-weight: 700; }
     .refresh-btn {
       background-color: #0d6efd;
       color: white;
@@ -49,14 +39,8 @@
       font-weight: 500;
       cursor: pointer;
     }
-    .refresh-btn:active {
-      background-color: #0b5ed7;
-    }
-    .news-list {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
+    .refresh-btn:active { background-color: #0b5ed7; }
+    .news-list { display: flex; flex-direction: column; gap: 12px; }
     .news-item {
       background: #ffffff;
       border-radius: 12px;
@@ -69,9 +53,7 @@
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
       transition: transform 0.1s ease;
     }
-    .news-item:active {
-      transform: scale(0.99);
-    }
+    .news-item:active { transform: scale(0.99); }
     .rank {
       font-size: 1.15rem;
       font-weight: 800;
@@ -115,29 +97,44 @@
   </main>
 
   <script>
+    async function fetchXml(targetUrl) {
+      // 1차 시도: corsproxy.io (가장 빠르고 안정적)
+      try {
+        const res = await fetch(`https://corsproxy.io/?url=${encodeURIComponent(targetUrl)}`);
+        if (res.ok) return await res.text();
+      } catch (e) {
+        console.warn('1차 프록시 실패, 2차 프록시로 전환');
+      }
+
+      // 2차 시도: allorigins 원문 raw 스트림
+      const res2 = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`);
+      if (res2.ok) return await res2.text();
+
+      throw new Error('모든 프록시 서버 응답 실패');
+    }
+
     async function loadNews() {
       const content = document.getElementById('content');
       content.innerHTML = '<div class="status">최신 뉴스를 가져오는 중...</div>';
 
-      // rss2json API 사용 (안정적으로 구글 뉴스 RSS를 JSON으로 변환)
-      const rssUrl = 'https://news.google.com/rss?hl=ko&gl=KR&ceid=KR:ko';
-      const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}`;
+      const targetRss = 'https://news.google.com/rss?hl=ko&gl=KR&ceid=KR:ko';
 
       try {
-        const response = await fetch(apiUrl);
-        if (!response.ok) throw new Error('네트워크 응답 오류');
+        const xmlText = await fetchXml(targetRss);
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
+        const items = xmlDoc.querySelectorAll('item');
 
-        const data = await response.json();
-        if (!data.items || data.items.length === 0) {
-          throw new Error('뉴스 목록이 비어있습니다.');
+        if (!items || items.length === 0) {
+          throw new Error('뉴스 항목을 찾을 수 없습니다.');
         }
 
-        const topItems = data.items.slice(0, 5);
+        const topItems = Array.from(items).slice(0, 5);
 
         let html = '<div class="news-list">';
         topItems.forEach((item, index) => {
-          const title = item.title || '제목 없음';
-          const link = item.link || '#';
+          const title = item.querySelector('title')?.textContent || '제목 없음';
+          const link = item.querySelector('link')?.textContent || '#';
 
           html += `
             <a class="news-item" href="${link}" target="_blank" rel="noopener noreferrer">
@@ -169,7 +166,6 @@
       });
     }
 
-    // 초기 실행
     loadNews();
   </script>
 </body>
