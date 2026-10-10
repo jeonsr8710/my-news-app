@@ -40,7 +40,7 @@
       min-height: 100vh;
     }
 
-    /* 상단 헤더 카드 */
+    /* 상단 배너 카드 */
     .header-card {
       background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 50%, #06b6d4 100%);
       color: white;
@@ -104,7 +104,7 @@
       justify-content: space-between;
       align-items: center;
       font-size: 0.8rem;
-      color: rgba(255, 255, 255, 0.9);
+      color: rgba(255, 255, 255, 0.95);
     }
 
     .refresh-btn {
@@ -140,7 +140,7 @@
       100% { transform: rotate(360deg); }
     }
 
-    /* 뉴스 리스트 */
+    /* 뉴스 목록 영역 */
     .news-list {
       display: flex;
       flex-direction: column;
@@ -224,7 +224,7 @@
       font-weight: 600;
     }
 
-    /* 로딩 및 에러 상태 */
+    /* 로딩 및 에러 */
     .status-box {
       text-align: center;
       padding: 50px 20px;
@@ -244,11 +244,23 @@
       animation: spin 0.8s linear infinite;
       margin: 0 auto 12px;
     }
+
+    .retry-btn {
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-top: 12px;
+    }
   </style>
 </head>
 <body>
 
-  <!-- 상단 카드 섹션 -->
+  <!-- 헤더 영역 -->
   <header class="header-card">
     <div class="badge">
       <div class="pulse-dot"></div>
@@ -267,7 +279,7 @@
     </div>
   </header>
 
-  <!-- 뉴스 목록 출력 영역 -->
+  <!-- 뉴스 본문 영역 -->
   <main id="content">
     <div class="status-box">
       <div class="spinner"></div>
@@ -276,7 +288,7 @@
   </main>
 
   <script>
-    // 현재 일시 포맷 (YYYY.MM.DD HH:mm:ss)
+    // 현재 일시 포맷 (MM.DD HH:mm:ss 기준)
     function getFormattedTime() {
       const now = new Date();
       const month = String(now.getMonth() + 1).padStart(2, '0');
@@ -287,29 +299,74 @@
       return `${month}.${day} ${hours}:${minutes}:${seconds} 기준`;
     }
 
-    // CORS 및 브라우저 캐싱 방지(Cache-Busting) Fetcher
-    async function fetchFreshXml(targetUrl) {
-      // 매 호출마다 완전히 고유한 타임스탬프를 부여해 프록시/브라우저 캐시 무력화
-      const timestamp = new Date().getTime();
-      const cacheBustedUrl = `${targetUrl}&_t=${timestamp}`;
+    // 1차 시도: rss2json API
+    async function fetchViaRss2Json(rssUrl) {
+      const t = Date.now();
+      const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}&_t=${t}`;
+      const res = await fetch(apiUrl, { cache: 'no-store' });
+      if (!res.ok) throw new Error('rss2json 오류');
+      const data = await res.json();
+      if (!data.items || data.items.length === 0) throw new Error('항목 없음');
 
-      // 1순위: corsproxy.io
-      try {
-        const res = await fetch(`https://corsproxy.io/?url=${encodeURIComponent(cacheBustedUrl)}`, {
-          cache: 'no-store'
-        });
-        if (res.ok) return await res.text();
-      } catch (e) {
-        console.warn('1차 프록시 우회 실패, 2차 프록시 진행');
-      }
+      return data.items.slice(0, 5).map(item => ({
+        title: item.title,
+        link: item.link,
+        source: item.author || '주요뉴스'
+      }));
+    }
 
-      // 2순위 대체: allorigins.win
-      const res2 = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(cacheBustedUrl)}`, {
-        cache: 'no-store'
+    // 2차 시도: Codetabs 오픈 프록시 (CORS 차단 회피율 높음)
+    async function fetchViaCodetabs(rssUrl) {
+      const t = Date.now();
+      const proxyUrl = `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(rssUrl + '?_t=' + t)}`;
+      const res = await fetch(proxyUrl, { cache: 'no-store' });
+      if (!res.ok) throw new Error('Codetabs 오류');
+      const text = await res.text();
+
+      const parser = new DOMParser();
+      const xmlDoc = parser.parseFromString(text, 'text/xml');
+      const items = xmlDoc.querySelectorAll('item');
+      if (!items || items.length === 0) throw new Error('XML 비어있음');
+
+      return Array.from(items).slice(0, 5).map(item => {
+        const rawTitle = item.querySelector('title')?.textContent || '제목 없음';
+        const link = item.querySelector('link')?.textContent || '#';
+        let title = rawTitle;
+        let source = '주요뉴스';
+        const splitIdx = rawTitle.lastIndexOf(' - ');
+        if (splitIdx !== -1) {
+          title = rawTitle.substring(0, splitIdx).trim();
+          source = rawTitle.substring(splitIdx + 3).trim();
+        }
+        return { title, link, source };
       });
-      if (res2.ok) return await res2.text();
+    }
 
-      throw new Error('프록시 연결 실패');
+    // 3차 시도: Allorigins 프록시
+    async function fetchViaAllOrigins(rssUrl) {
+      const t = Date.now();
+      const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(rssUrl + '?_t=' + t)}`;
+      const res = await fetch(proxyUrl, { cache: 'no-store' });
+      if (!res.ok) throw new Error('AllOrigins 오류');
+      const text = await res.text();
+
+      const parser = new DOMParser();
+      const xmlDoc = parser.parseFromString(text, 'text/xml');
+      const items = xmlDoc.querySelectorAll('item');
+      if (!items || items.length === 0) throw new Error('XML 비어있음');
+
+      return Array.from(items).slice(0, 5).map(item => {
+        const rawTitle = item.querySelector('title')?.textContent || '제목 없음';
+        const link = item.querySelector('link')?.textContent || '#';
+        let title = rawTitle;
+        let source = '주요뉴스';
+        const splitIdx = rawTitle.lastIndexOf(' - ');
+        if (splitIdx !== -1) {
+          title = rawTitle.substring(0, splitIdx).trim();
+          source = rawTitle.substring(splitIdx + 3).trim();
+        }
+        return { title, link, source };
+      });
     }
 
     async function loadNews() {
@@ -321,45 +378,50 @@
       content.innerHTML = `
         <div class="status-box">
           <div class="spinner"></div>
-          새로운 뉴스를 불러오는 중입니다...
+          새로운 뉴스를 실시간으로 불러오는 중입니다...
         </div>
       `;
 
-      const targetRss = 'https://news.google.com/rss?hl=ko&gl=KR&ceid=KR:ko';
+      // 1순위: 연합뉴스 실시간 속보 (국내 서버라 프록시 차단이 없음)
+      // 2순위: 구글 뉴스 (대체용)
+      const feedUrls = [
+        'https://www.yna.co.kr/rss/news.xml',
+        'https://news.google.com/rss?hl=ko&gl=KR&ceid=KR:ko'
+      ];
 
-      try {
-        const xmlText = await fetchFreshXml(targetRss);
-        const parser = new DOMParser();
-        const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
-        const items = xmlDoc.querySelectorAll('item');
+      let newsList = null;
 
-        if (!items || items.length === 0) {
-          throw new Error('뉴스 목록이 비어있습니다.');
-        }
-
-        const topItems = Array.from(items).slice(0, 5);
-
-        let html = '<div class="news-list">';
-        topItems.forEach((item, index) => {
-          const rawTitle = item.querySelector('title')?.textContent || '제목 없음';
-          const link = item.querySelector('link')?.textContent || '#';
-
-          // 구글 뉴스 제목 분리 (예: "기사 제목 - 언론사" 구조 처리)
-          let title = rawTitle;
-          let source = '종합';
-          const splitIndex = rawTitle.lastIndexOf(' - ');
-          if (splitIndex !== -1) {
-            title = rawTitle.substring(0, splitIndex).trim();
-            source = rawTitle.substring(splitIndex + 3).trim();
+      // 단계별 우회 시도: rss2json -> codetabs -> allorigins
+      for (const feed of feedUrls) {
+        try {
+          newsList = await fetchViaRss2Json(feed);
+          if (newsList && newsList.length > 0) break;
+        } catch (e) {
+          try {
+            newsList = await fetchViaCodetabs(feed);
+            if (newsList && newsList.length > 0) break;
+          } catch (e2) {
+            try {
+              newsList = await fetchViaAllOrigins(feed);
+              if (newsList && newsList.length > 0) break;
+            } catch (e3) {
+              console.warn('프록시 시도 실패:', feed);
+            }
           }
+        }
+      }
 
+      // 화면 출력
+      if (newsList && newsList.length > 0) {
+        let html = '<div class="news-list">';
+        newsList.forEach((item, index) => {
           html += `
-            <a class="news-card" href="${link}" target="_blank" rel="noopener noreferrer">
+            <a class="news-card" href="${item.link}" target="_blank" rel="noopener noreferrer">
               <div class="rank-badge">${index + 1}</div>
               <div class="news-body">
-                <div class="news-title">${title}</div>
+                <div class="news-title">${item.title}</div>
                 <div class="news-info">
-                  <span class="source-tag">${source}</span>
+                  <span class="source-tag">${item.source}</span>
                   <span>상세보기 &rarr;</span>
                 </div>
               </div>
@@ -370,17 +432,17 @@
 
         content.innerHTML = html;
         searchTimeEl.textContent = getFormattedTime();
-      } catch (error) {
-        console.error('Fetch error:', error);
+      } else {
         content.innerHTML = `
           <div class="status-box" style="color: #ef4444; border-color: #fca5a5;">
             뉴스를 갱신하지 못했습니다.<br>
-            <small style="color: #94a3b8;">네트워크 연결 상태를 확인해주세요.</small>
+            <small style="color: #94a3b8;">일시적인 통신 지연입니다. 잠시 후 새로고침을 눌러주세요.</small><br>
+            <button class="retry-btn" onclick="loadNews()">다시 시도</button>
           </div>
         `;
-      } finally {
-        refreshBtn.classList.remove('loading');
       }
+
+      refreshBtn.classList.remove('loading');
     }
 
     // 서비스 워커 등록
@@ -390,7 +452,7 @@
       });
     }
 
-    // 초기 자동 조회
+    // 페이지 진입 시 자동 로드
     loadNews();
   </script>
 </body>
