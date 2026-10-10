@@ -2,170 +2,395 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>실시간 주요 뉴스 Top 5</title>
   
   <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#0d6efd">
+  <meta name="theme-color" content="#4f46e5">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="주요뉴스">
 
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans KR", sans-serif;
-      background-color: #f8f9fa;
-      color: #212529;
-      padding: 16px;
+    :root {
+      --primary: #4f46e5;
+      --primary-dark: #4338ca;
+      --accent: #06b6d4;
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --text-main: #0f172a;
+      --text-sub: #64748b;
+      --border: #e2e8f0;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
       -webkit-tap-highlight-color: transparent;
     }
-    header {
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text-main);
+      padding: 20px 16px 40px;
+      max-width: 600px;
+      margin: 0 auto;
+      min-height: 100vh;
+    }
+
+    /* 상단 헤더 카드 */
+    .header-card {
+      background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 50%, #06b6d4 100%);
+      color: white;
+      border-radius: 20px;
+      padding: 24px 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 10px 25px -5px rgba(79, 70, 229, 0.35);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .header-card::after {
+      content: '';
+      position: absolute;
+      top: -40px;
+      right: -40px;
+      width: 130px;
+      height: 130px;
+      background: rgba(255, 255, 255, 0.12);
+      border-radius: 50%;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(255, 255, 255, 0.2);
+      backdrop-filter: blur(8px);
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      margin-bottom: 10px;
+    }
+
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      background-color: #22c55e;
+      border-radius: 50%;
+      box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
+      70% { box-shadow: 0 0 0 8px rgba(34, 197, 94, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+    }
+
+    .header-title {
+      font-size: 1.45rem;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      margin-bottom: 12px;
+    }
+
+    .header-meta {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 20px;
-      padding-bottom: 12px;
-      border-bottom: 1px solid #e9ecef;
+      font-size: 0.8rem;
+      color: rgba(255, 255, 255, 0.9);
     }
-    h1 { font-size: 1.25rem; font-weight: 700; }
+
     .refresh-btn {
-      background-color: #0d6efd;
-      color: white;
-      border: none;
-      padding: 8px 14px;
-      border-radius: 8px;
-      font-size: 0.9rem;
-      font-weight: 500;
-      cursor: pointer;
-    }
-    .refresh-btn:active { background-color: #0b5ed7; }
-    .news-list { display: flex; flex-direction: column; gap: 12px; }
-    .news-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
       background: #ffffff;
+      color: var(--primary);
+      border: none;
+      padding: 8px 16px;
       border-radius: 12px;
-      padding: 16px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      transition: all 0.2s ease;
+    }
+
+    .refresh-btn:active {
+      transform: scale(0.96);
+      background: #f1f5f9;
+    }
+
+    .refresh-btn svg {
+      transition: transform 0.4s ease;
+    }
+
+    .refresh-btn.loading svg {
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      100% { transform: rotate(360deg); }
+    }
+
+    /* 뉴스 리스트 */
+    .news-list {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .news-card {
+      background: var(--card-bg);
+      border-radius: 16px;
+      padding: 18px 16px;
       text-decoration: none;
       color: inherit;
       display: flex;
       align-items: flex-start;
-      gap: 12px;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-      transition: transform 0.1s ease;
+      gap: 14px;
+      border: 1px solid var(--border);
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
     }
-    .news-item:active { transform: scale(0.99); }
-    .rank {
-      font-size: 1.15rem;
+
+    .news-card:active {
+      transform: scale(0.985);
+      background: #f8fafc;
+    }
+
+    .rank-badge {
+      width: 28px;
+      height: 28px;
+      min-width: 28px;
+      border-radius: 8px;
+      background: #f1f5f9;
+      color: var(--text-sub);
+      font-size: 0.9rem;
       font-weight: 800;
-      color: #0d6efd;
-      min-width: 22px;
-      line-height: 1.3;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
-    .title {
-      font-size: 0.95rem;
+
+    .news-card:nth-child(1) .rank-badge {
+      background: #fee2e2;
+      color: #ef4444;
+    }
+    .news-card:nth-child(2) .rank-badge {
+      background: #ffedd5;
+      color: #f97316;
+    }
+    .news-card:nth-child(3) .rank-badge {
+      background: #fef3c7;
+      color: #f59e0b;
+    }
+
+    .news-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .news-title {
+      font-size: 0.98rem;
+      font-weight: 600;
       line-height: 1.45;
+      color: var(--text-main);
       word-break: keep-all;
     }
-    .status {
-      text-align: center;
-      padding: 40px 0;
-      color: #6c757d;
-      font-size: 0.95rem;
-      line-height: 1.6;
+
+    .news-info {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.75rem;
+      color: var(--text-sub);
     }
-    .retry-btn {
-      margin-top: 10px;
-      background: #6c757d;
-      color: white;
-      border: none;
-      font-size: 0.85rem;
-      padding: 8px 16px;
-      border-radius: 6px;
-      cursor: pointer;
+
+    .source-tag {
+      background: #eef2ff;
+      color: var(--primary);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: 600;
+    }
+
+    /* 로딩 및 에러 상태 */
+    .status-box {
+      text-align: center;
+      padding: 50px 20px;
+      background: white;
+      border-radius: 16px;
+      border: 1px dashed var(--border);
+      color: var(--text-sub);
+      font-size: 0.9rem;
+    }
+
+    .spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid #e2e8f0;
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 12px;
     }
   </style>
 </head>
 <body>
 
-  <header>
-    <h1>실시간 주요 뉴스 Top 5</h1>
-    <button class="refresh-btn" onclick="loadNews()">새로고침</button>
+  <!-- 상단 카드 섹션 -->
+  <header class="header-card">
+    <div class="badge">
+      <div class="pulse-dot"></div>
+      실시간 LIVE
+    </div>
+    <div class="header-title">오늘의 주요 뉴스 Top 5</div>
+    <div class="header-meta">
+      <div id="searchTime">조회 중...</div>
+      <button id="refreshBtn" class="refresh-btn" onclick="loadNews()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="23 4 23 10 17 10"></polyline>
+          <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+        </svg>
+        <span>새로고침</span>
+      </button>
+    </div>
   </header>
 
+  <!-- 뉴스 목록 출력 영역 -->
   <main id="content">
-    <div class="status">뉴스를 불러오는 중...</div>
+    <div class="status-box">
+      <div class="spinner"></div>
+      최신 뉴스를 실시간으로 수집하고 있습니다...
+    </div>
   </main>
 
   <script>
-    async function fetchXml(targetUrl) {
-      // 1차 시도: corsproxy.io (가장 빠르고 안정적)
+    // 현재 일시 포맷 (YYYY.MM.DD HH:mm:ss)
+    function getFormattedTime() {
+      const now = new Date();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      const hours = String(now.getHours()).padStart(2, '0');
+      const minutes = String(now.getMinutes()).padStart(2, '0');
+      const seconds = String(now.getSeconds()).padStart(2, '0');
+      return `${month}.${day} ${hours}:${minutes}:${seconds} 기준`;
+    }
+
+    // CORS 및 브라우저 캐싱 방지(Cache-Busting) Fetcher
+    async function fetchFreshXml(targetUrl) {
+      // 매 호출마다 완전히 고유한 타임스탬프를 부여해 프록시/브라우저 캐시 무력화
+      const timestamp = new Date().getTime();
+      const cacheBustedUrl = `${targetUrl}&_t=${timestamp}`;
+
+      // 1순위: corsproxy.io
       try {
-        const res = await fetch(`https://corsproxy.io/?url=${encodeURIComponent(targetUrl)}`);
+        const res = await fetch(`https://corsproxy.io/?url=${encodeURIComponent(cacheBustedUrl)}`, {
+          cache: 'no-store'
+        });
         if (res.ok) return await res.text();
       } catch (e) {
-        console.warn('1차 프록시 실패, 2차 프록시로 전환');
+        console.warn('1차 프록시 우회 실패, 2차 프록시 진행');
       }
 
-      // 2차 시도: allorigins 원문 raw 스트림
-      const res2 = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`);
+      // 2순위 대체: allorigins.win
+      const res2 = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(cacheBustedUrl)}`, {
+        cache: 'no-store'
+      });
       if (res2.ok) return await res2.text();
 
-      throw new Error('모든 프록시 서버 응답 실패');
+      throw new Error('프록시 연결 실패');
     }
 
     async function loadNews() {
       const content = document.getElementById('content');
-      content.innerHTML = '<div class="status">최신 뉴스를 가져오는 중...</div>';
+      const refreshBtn = document.getElementById('refreshBtn');
+      const searchTimeEl = document.getElementById('searchTime');
+
+      refreshBtn.classList.add('loading');
+      content.innerHTML = `
+        <div class="status-box">
+          <div class="spinner"></div>
+          새로운 뉴스를 불러오는 중입니다...
+        </div>
+      `;
 
       const targetRss = 'https://news.google.com/rss?hl=ko&gl=KR&ceid=KR:ko';
 
       try {
-        const xmlText = await fetchXml(targetRss);
+        const xmlText = await fetchFreshXml(targetRss);
         const parser = new DOMParser();
         const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
         const items = xmlDoc.querySelectorAll('item');
 
         if (!items || items.length === 0) {
-          throw new Error('뉴스 항목을 찾을 수 없습니다.');
+          throw new Error('뉴스 목록이 비어있습니다.');
         }
 
         const topItems = Array.from(items).slice(0, 5);
 
         let html = '<div class="news-list">';
         topItems.forEach((item, index) => {
-          const title = item.querySelector('title')?.textContent || '제목 없음';
+          const rawTitle = item.querySelector('title')?.textContent || '제목 없음';
           const link = item.querySelector('link')?.textContent || '#';
 
+          // 구글 뉴스 제목 분리 (예: "기사 제목 - 언론사" 구조 처리)
+          let title = rawTitle;
+          let source = '종합';
+          const splitIndex = rawTitle.lastIndexOf(' - ');
+          if (splitIndex !== -1) {
+            title = rawTitle.substring(0, splitIndex).trim();
+            source = rawTitle.substring(splitIndex + 3).trim();
+          }
+
           html += `
-            <a class="news-item" href="${link}" target="_blank" rel="noopener noreferrer">
-              <span class="rank">${index + 1}</span>
-              <span class="title">${title}</span>
+            <a class="news-card" href="${link}" target="_blank" rel="noopener noreferrer">
+              <div class="rank-badge">${index + 1}</div>
+              <div class="news-body">
+                <div class="news-title">${title}</div>
+                <div class="news-info">
+                  <span class="source-tag">${source}</span>
+                  <span>상세보기 &rarr;</span>
+                </div>
+              </div>
             </a>
           `;
         });
         html += '</div>';
 
         content.innerHTML = html;
+        searchTimeEl.textContent = getFormattedTime();
       } catch (error) {
         console.error('Fetch error:', error);
         content.innerHTML = `
-          <div class="status" style="color: #dc3545;">
-            뉴스를 불러오지 못했습니다.<br>
-            <button class="retry-btn" onclick="loadNews()">다시 시도</button>
+          <div class="status-box" style="color: #ef4444; border-color: #fca5a5;">
+            뉴스를 갱신하지 못했습니다.<br>
+            <small style="color: #94a3b8;">네트워크 연결 상태를 확인해주세요.</small>
           </div>
         `;
+      } finally {
+        refreshBtn.classList.remove('loading');
       }
     }
 
     // 서비스 워커 등록
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js')
-          .then(reg => console.log('서비스 워커 등록 성공:', reg.scope))
-          .catch(err => console.log('서비스 워커 등록 실패:', err));
+        navigator.serviceWorker.register('./sw.js').catch(console.error);
       });
     }
 
+    // 초기 자동 조회
     loadNews();
   </script>
 </body>
